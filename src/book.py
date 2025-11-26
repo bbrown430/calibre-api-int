@@ -10,18 +10,17 @@ class Book:
         self.filepath = f"downloads/{formatted_list_name}/{self.filename}"
 
     def filepath_prep(self, title, list_name):
-        restricted_characters = r'[\/:*?"<>|]'
+        restricted_characters = r'[\/\:*?"<>|]'
         if title is None:
             title = "no_title"
-        if ":" in title:
-            split_title = title.split(":")
-            title = split_title[0]
-        self.title = re.sub(restricted_characters, '', title)
+        # Do not remove slashes from title for metadata/search
+        self.title = title
         temp_author = re.sub(restricted_characters, '', self.author)
         self.author = temp_author
-        self.filename = self.title + " - " + self.author + ".epub"
-        self.attachment_name = self.title + ".epub"
-        #self.attachment_name = attachment_name.replace("'", "")
+        # Remove restricted characters from filename only
+        safe_title = re.sub(restricted_characters, '', title)
+        self.filename = safe_title + " - " + self.author + ".epub"
+        self.attachment_name = safe_title + ".epub"
         if list_name is not None:
             self.set_directory(list_name)
         else:
