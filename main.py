@@ -33,13 +33,30 @@ if __name__ == "__main__":
         print("No books found from Goodreads list.")
         sys.exit(1)
 
-    # For each book, search and download
+    # Connect to metadata.db
+    conn = sqlite3.connect("metadata.db")
+    cursor = conn.cursor()
+
+    # For each book, search and download if not in metadata.db
     for book_idx, book in enumerate(books):
         author = getattr(book, 'author', None)
         title = getattr(book, 'title', None)
         if not author or not title:
             print(f"Skipping book with missing author/title: {book}")
             continue
+
+        # Use partial matching for title and author
+        cursor.execute("""
+            SELECT COUNT(*) FROM books
+            JOIN books_authors_link ON books.id = books_authors_link.book
+            JOIN authors ON books_authors_link.author = authors.id
+            WHERE books.title LIKE ? AND authors.name LIKE ?
+        """, (f"%{title}%", f"%{author}%"))
+        exists = cursor.fetchone()[0]
+        if exists:
+            print(f"Skipping '{title}' by '{author}' (partial match found in metadata.db)")
+            continue
+
         print(f"\nBook {book_idx+1}: '{title}' by '{author}'")
         search_url = f"{url_base}search?author={author}&title={title}{query_ending}"
         data = get_response(search_url)
@@ -70,3 +87,5 @@ if __name__ == "__main__":
                 poll += 1
             if found:
                 break
+
+    conn.close()
