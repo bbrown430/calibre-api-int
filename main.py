@@ -1,6 +1,8 @@
 import requests
 import time
 import sys
+from dotenv import load_dotenv
+import os
 import argparse
 import sqlite3
 from goodreads_list import GoodreadsList
@@ -28,14 +30,14 @@ def get_book_status(id):
             return category
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Calibre API Goodreads Downloader")
-    parser.add_argument("--metadata", type=str, required=True, help="Path to metadata.db file")
-    parser.add_argument("--goodreads", type=str, required=True, help="Comma-separated list of Goodreads URLs")
-    args = parser.parse_args()
-
-    metadata_path = args.metadata
-    goodreads_urls = [url.strip() for url in args.goodreads.split(",") if url.strip()]
-
+    # Load environment variables from .env file
+    load_dotenv()
+    metadata_path = os.getenv("METADATA_DB")
+    goodreads_urls_env = os.getenv("GOODREADS_URLS", "")
+    goodreads_urls = [url.strip() for url in goodreads_urls_env.split(",") if url.strip()]
+    if not metadata_path or not goodreads_urls:
+        print("Error: METADATA_DB or GOODREADS_URLS not set in .env file.")
+        sys.exit(1)
     conn = sqlite3.connect(metadata_path)
     cursor = conn.cursor()
 

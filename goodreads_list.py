@@ -106,7 +106,15 @@ class GoodreadsList(Scraper):
             for book_html in book_list:
                 if main_series_count < book_count:
                     entry_number_container = book_html.find("h3").text
-                    entry_number_float = float(entry_number_container.split("Book ")[1])
+                    entry_number_str = entry_number_container.split("Book ")[1]
+                    # Skip entries with a dash in the number (e.g., '1-2')
+                    if "-" in entry_number_str:
+                        continue
+                    try:
+                        entry_number_float = float(entry_number_str.strip())
+                    except ValueError:
+                        print(f"Warning: Could not parse book number from '{entry_number_container}'. Skipping entry.")
+                        continue
                     if entry_number_float % 1 == 0: #determine if main series entry
                         if entry_number_float != 0:
                             main_series_count += 1
