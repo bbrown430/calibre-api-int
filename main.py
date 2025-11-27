@@ -5,9 +5,13 @@ from dotenv import load_dotenv
 import os
 import argparse
 import sqlite3
+from fuzzywuzzy import fuzz
+
 from goodreads_list import GoodreadsList
 
-url_base = "http://100.67.69.109:8084/request/api/"
+# Get API IP from environment variable, fallback to default
+api_ip = os.environ.get("CALIBRE_API_IP", "100.67.69.109")
+url_base = f"http://{api_ip}:8084/request/api/"
 query_ending = "&lang=en&format=epub&format=mobi&format=azw3&format=fb2&format=djvu&format=cbz&format=cbr"
 
 def get_response(url):
@@ -30,13 +34,13 @@ def get_book_status(id):
             return category
 
 if __name__ == "__main__":
-    # Load environment variables from .env file
-    load_dotenv()
-    metadata_path = os.getenv("METADATA_DB")
-    goodreads_urls_env = os.getenv("GOODREADS_URLS", "")
+    # Load environment variables from .env file if present, but allow direct env usage
+    load_dotenv(override=False)
+    metadata_path = os.environ.get("METADATA_DB")
+    goodreads_urls_env = os.environ.get("GOODREADS_URLS", "")
     goodreads_urls = [url.strip() for url in goodreads_urls_env.split(",") if url.strip()]
     if not metadata_path or not goodreads_urls:
-        print("Error: METADATA_DB or GOODREADS_URLS not set in .env file.")
+        print("Error: METADATA_DB or GOODREADS_URLS not set in environment variables or .env file.")
         sys.exit(1)
     conn = sqlite3.connect(metadata_path)
     cursor = conn.cursor()
@@ -56,16 +60,22 @@ if __name__ == "__main__":
                 print(f"Skipping book with missing author/title: {book}")
                 continue
 
-            # Use partial matching for title and author
+            # Fuzzy match for title and author
             cursor.execute("""
-                SELECT COUNT(*) FROM books
+                SELECT books.title, authors.name FROM books
                 JOIN books_authors_link ON books.id = books_authors_link.book
                 JOIN authors ON books_authors_link.author = authors.id
-                WHERE books.title LIKE ? AND authors.name LIKE ?
-            """, (f"%{title}%", f"%{author}%"))
-            exists = cursor.fetchone()[0]
-            if exists:
-                print(f"Skipping '{title}' by '{author}' (partial match found in metadata.db)")
+            """)
+            matches = cursor.fetchall()
+            found_fuzzy = False
+            for db_title, db_author in matches:
+                title_score = fuzz.token_set_ratio(title.lower(), db_title.lower())
+                author_score = fuzz.token_set_ratio(author.lower(), db_author.lower())
+                if title_score > 90 and author_score > 90:
+                    found_fuzzy = True
+                    break
+            if found_fuzzy:
+                print(f"Skipping '{title}' by '{author}' (fuzzy match found in metadata.db)")
                 continue
 
             print(f"\nBook {book_idx+1}: '{title}' by '{author}'")

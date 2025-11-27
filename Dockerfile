@@ -6,8 +6,7 @@ WORKDIR /app
 
 # Copy requirements and source code
 COPY requirements.txt .
-COPY .env.example .
-COPY .env .
+## Do not copy .env files; use environment variables in Docker UI or CLI
 COPY goodreads_list.py main.py /app/
 COPY src /app/src
 
