@@ -6,6 +6,7 @@ import os
 import argparse
 import sqlite3
 import unicodedata
+import string
 from fuzzywuzzy import fuzz
 
 from goodreads_list import GoodreadsList
@@ -66,6 +67,9 @@ if __name__ == "__main__":
             def strip_accents(s):
                 return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
 
+            def strip_punctuation(s):
+                return s.translate(str.maketrans('', '', string.punctuation))
+
             cursor.execute("""
                 SELECT books.title, authors.name FROM books
                 JOIN books_authors_link ON books.id = books_authors_link.book
@@ -73,11 +77,11 @@ if __name__ == "__main__":
             """)
             matches = cursor.fetchall()
             found_fuzzy = False
-            norm_title = strip_accents(title.lower())
-            norm_author = strip_accents(author.lower())
+            norm_title = strip_punctuation(strip_accents(title.lower()))
+            norm_author = strip_punctuation(strip_accents(author.lower()))
             for db_title, db_author in matches:
-                db_norm_title = strip_accents(db_title.lower())
-                db_norm_author = strip_accents(db_author.lower())
+                db_norm_title = strip_punctuation(strip_accents(db_title.lower()))
+                db_norm_author = strip_punctuation(strip_accents(db_author.lower()))
                 title_score = fuzz.token_set_ratio(norm_title, db_norm_title)
                 author_score = fuzz.token_set_ratio(norm_author, db_norm_author)
                 if title_score > 90 and author_score > 90:
