@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import os
 import argparse
 import sqlite3
+import unicodedata
 from fuzzywuzzy import fuzz
 
 from goodreads_list import GoodreadsList
@@ -45,6 +46,7 @@ if __name__ == "__main__":
     conn = sqlite3.connect(metadata_path)
     cursor = conn.cursor()
 
+    not_downloaded = []
     for goodreads_url in goodreads_urls:
         print(f"Processing Goodreads URL: {goodreads_url}")
         glist = GoodreadsList()
@@ -60,7 +62,10 @@ if __name__ == "__main__":
                 print(f"Skipping book with missing author/title: {book}")
                 continue
 
-            # Fuzzy match for title and author
+            # Fuzzy match for title and author, normalize accents
+            def strip_accents(s):
+                return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+
             cursor.execute("""
                 SELECT books.title, authors.name FROM books
                 JOIN books_authors_link ON books.id = books_authors_link.book
@@ -68,9 +73,13 @@ if __name__ == "__main__":
             """)
             matches = cursor.fetchall()
             found_fuzzy = False
+            norm_title = strip_accents(title.lower())
+            norm_author = strip_accents(author.lower())
             for db_title, db_author in matches:
-                title_score = fuzz.token_set_ratio(title.lower(), db_title.lower())
-                author_score = fuzz.token_set_ratio(author.lower(), db_author.lower())
+                db_norm_title = strip_accents(db_title.lower())
+                db_norm_author = strip_accents(db_author.lower())
+                title_score = fuzz.token_set_ratio(norm_title, db_norm_title)
+                author_score = fuzz.token_set_ratio(norm_author, db_norm_author)
                 if title_score > 90 and author_score > 90:
                     found_fuzzy = True
                     break
@@ -83,6 +92,7 @@ if __name__ == "__main__":
             data = get_response(search_url)
             if not (isinstance(data, list) and len(data) > 0 and 'id' in data[0]):
                 print(f"No valid search result for '{title}' by '{author}'. Skipping.")
+                not_downloaded.append((title, author, "No valid search result"))
                 continue
 
             found = False
@@ -108,5 +118,13 @@ if __name__ == "__main__":
                     poll += 1
                 if found:
                     break
+            if not found:
+                not_downloaded.append((title, author, "All attempts failed"))
 
     conn.close()
+
+    # Log all books that were not successfully downloaded
+    if not_downloaded:
+        print("\nBooks not successfully downloaded:")
+        for title, author, reason in not_downloaded:
+            print(f"- '{title}' by '{author}' ({reason})")
