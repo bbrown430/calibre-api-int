@@ -93,7 +93,14 @@ if __name__ == "__main__":
 
             print(f"\nBook {book_idx+1}: '{title}' by '{author}'")
             # New API uses a single query parameter with URL encoding
-            query = f"{title} {author}"
+            # If author name contains periods (initials), use only the last name
+            # to avoid issues with inconsistent formatting (e.g., "R. F. Kuang" vs "R.F. Kuang")
+            if '.' in author:
+                # Extract the last word as the last name
+                author_query = author.split()[-1]
+            else:
+                author_query = author
+            query = f"{title} {author_query}"
             encoded_query = urllib.parse.quote(query)
             search_url = f"{url_base}search?query={encoded_query}&sort=relevance"
             data = get_response(search_url)
