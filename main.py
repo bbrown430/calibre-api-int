@@ -114,7 +114,7 @@ if __name__ == "__main__":
                 while True:
                     status = get_book_status(book_id)
                     print(f"      Poll {poll}: Book '{title}' (ID: {book_id}) status: {status}")
-                    if status == "done":
+                    if status == "complete":
                         print(f"Book '{title}' (ID: {book_id}) download completed successfully.")
                         found = True
                         break
