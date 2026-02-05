@@ -7,14 +7,14 @@ import argparse
 import sqlite3
 import unicodedata
 import string
+import urllib.parse
 from fuzzywuzzy import fuzz
 
 from goodreads_list import GoodreadsList
 
 # Get API IP from environment variable, fallback to default
 api_ip = os.environ.get("CALIBRE_API_IP", "100.67.69.109")
-url_base = f"http://{api_ip}:8084/request/api/"
-query_ending = "&lang=en&format=epub&format=mobi&format=azw3&format=fb2&format=djvu&format=cbz&format=cbr"
+url_base = f"http://{api_ip}:8084/api/"
 
 def get_response(url):
     try:
@@ -92,7 +92,10 @@ if __name__ == "__main__":
                 continue
 
             print(f"\nBook {book_idx+1}: '{title}' by '{author}'")
-            search_url = f"{url_base}search?author={author}&title={title}{query_ending}"
+            # New API uses a single query parameter with URL encoding
+            query = f"{title} {author}"
+            encoded_query = urllib.parse.quote(query)
+            search_url = f"{url_base}search?query={encoded_query}&sort=relevance"
             data = get_response(search_url)
             if not (isinstance(data, list) and len(data) > 0 and 'id' in data[0]):
                 print(f"No valid search result for '{title}' by '{author}'. Skipping.")

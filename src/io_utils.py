@@ -45,10 +45,17 @@ class IOUtils:
 
     # returns HTML from a website into a parseable format
     @staticmethod
-    def cook_soup(url, cdn=None):
+    def cook_soup(url, cdn=None, cookies=None):
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
+        # Check for Goodreads cookie in environment if not provided
+        if cookies is None and 'goodreads.com' in url:
+            goodreads_cookie = os.environ.get('GOODREADS_COOKIE')
+            if goodreads_cookie:
+                headers['Cookie'] = goodreads_cookie
+        elif cookies:
+            headers['Cookie'] = cookies
         error_count = 0
         while True:
             response = requests.get(url, headers=headers)

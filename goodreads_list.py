@@ -3,6 +3,7 @@ from src.book import Book
 from src.io_utils import IOUtils
 import validators
 import math
+import re
 
 class GoodreadsList(Scraper):
     def __init__(self):
@@ -12,7 +13,9 @@ class GoodreadsList(Scraper):
         if validators.url(list_url):
             if "/review/" in list_url:
                 page = 1
-                formatted_url = list_url + f"&page={page}&per_page=10"
+                # Check if URL already has query parameters
+                separator = "&" if "?" in list_url else "?"
+                formatted_url = list_url + f"{separator}page={page}&per_page=10"
                 return "profile", formatted_url
             elif "/list/show" in list_url:
                 return "listopia", list_url
@@ -34,15 +37,32 @@ class GoodreadsList(Scraper):
         
         goodreads_books = []
         if type == "profile":
-            # determine number of books on shelf
-            want_to_read_span = soup.find('span', class_='h1Shelf')
-            count_text = want_to_read_span.find('span', class_='greyText').text
-            self.book_count = int(count_text.replace('(', '').replace(')', ''))    
-            # get list name
-            raw_list_name = soup.text
-            filtered_list_name = raw_list_name.replace("\n", "")
-            name_split = filtered_list_name.split(" (")
-            self.list_name = name_split[0]
+            # determine number of books on shelf from title tag
+            # Format: "Name's 'shelf-name' books on Goodreads (N books)"
+            title_tag = soup.find('title')
+            if title_tag:
+                title_text = title_tag.text
+                match = re.search(r'\((\d+)\s*books?\)', title_text)
+                if match:
+                    self.book_count = int(match.group(1))
+                else:
+                    # Fallback: count books on first page and estimate
+                    self.book_count = 100  # Default estimate
+            else:
+                self.book_count = 100
+
+            # get list name from title
+            if title_tag:
+                # Extract shelf name from title like "Brian Brown's 'want-to-read' books on Goodreads"
+                title_text = title_tag.text
+                match = re.search(r"'([^']+)'", title_text)
+                if match:
+                    self.list_name = match.group(1)
+                else:
+                    # Fallback for "all" shelf format
+                    self.list_name = "goodreads-books"
+            else:
+                self.list_name = "goodreads-books"
 
             # Always use all books
             pages_needed = math.ceil(self.book_count / 10)
@@ -50,7 +70,12 @@ class GoodreadsList(Scraper):
             books_remaining = self.book_count
             while page <= pages_needed and books_remaining > 0:
                 book_table = soup.find("tbody", {"id": "booksBody"})
+                if not book_table:
+                    print("Could not find booksBody table")
+                    break
                 book_list = book_table.findAll("tr")
+                if not book_list:
+                    break
                 if books_remaining < 10:
                     book_list = book_list[:books_remaining]
                 for book_html in book_list:
@@ -59,7 +84,8 @@ class GoodreadsList(Scraper):
                     goodreads_books.append(goodreads_book)
                 books_remaining -= len(book_list)
                 page += 1
-                url_with_attrs = list_url + f"&page={page}&per_page=10"
+                separator = "&" if "?" in list_url else "?"
+                url_with_attrs = list_url + f"{separator}page={page}&per_page=10"
                 soup = IOUtils.cook_soup(url_with_attrs)
         
         if type == "listopia":
